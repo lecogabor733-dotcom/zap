@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zap — Video Downloader</title>
+<style>
+  :root{
+    --bg:#07070d; --card:rgba(255,255,255,.04); --line:rgba(255,255,255,.09);
+    --text:#f2f3f8; --mute:#8a8ea3; --a:#7c5cff; --b:#00e5ff; --c:#ff3d9a; --ok:#35f2a0; --bad:#ff5c7a;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
+  canvas#fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+  .glow{position:fixed;width:60vmax;height:60vmax;border-radius:50%;filter:blur(120px);opacity:.28;z-index:0;pointer-events:none;animation:drift 18s ease-in-out infinite alternate}
+  .g1{background:var(--a);top:-25vmax;left:-15vmax}
+  .g2{background:var(--c);bottom:-30vmax;right:-20vmax;animation-delay:-9s}
+  @keyframes drift{to{transform:translate(8vmax,6vmax) scale(1.1)}}
+  main{position:relative;z-index:1;width:min(720px,92vw);padding:9vh 0 6vh;text-align:center}
+  .logo{display:inline-flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px;font-size:18px;color:var(--mute)}
+  .bolt{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 0 30px rgba(124,92,255,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 50px rgba(0,229,255,.7)}}
+  h1{font-size:clamp(40px,8vw,76px);line-height:1;margin:26px 0 14px;font-weight:900;letter-spacing:-2px}
+  h1 span{background:linear-gradient(90deg,var(--b),var(--a),var(--c),var(--b));background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 6s linear infinite}
+  @keyframes shine{to{background-position:250% 0}}
+  .sub{color:var(--mute);font-size:clamp(15px,2.4vw,18px);margin-bottom:34px}
+  .box{position:relative;padding:2px;border-radius:20px;background:linear-gradient(120deg,var(--a),var(--b),var(--c),var(--a));background-size:300% 300%;animation:flow 6s linear infinite}
+  @keyframes flow{to{background-position:300% 0}}
+  .inner{display:flex;gap:8px;background:#0c0c16;border-radius:18px;padding:8px}
+  input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--text);font-size:17px;padding:14px 16px}
+  input::placeholder{color:#5d6177}
+  button{font:inherit;cursor:pointer;border:0;color:#fff;font-weight:700;border-radius:13px;transition:transform .15s,filter .15s,opacity .15s}
+  button:active{transform:scale(.96)}
+  .ghost{background:var(--card);border:1px solid var(--line);padding:0 16px;color:var(--mute)}
+  .ghost:hover{color:var(--text);border-color:#ffffff30}
+  .go{background:linear-gradient(135deg,var(--a),var(--b));padding:0 26px;font-size:16px;box-shadow:0 8px 30px rgba(124,92,255,.45)}
+  .go:hover{filter:brightness(1.15)}
+  .go:disabled{opacity:.5;cursor:wait}
+  .err{margin-top:16px;color:var(--bad);font-size:14px;min-height:20px}
+  .card{display:none;margin-top:22px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;backdrop-filter:blur(14px);animation:up .45s cubic-bezier(.2,.8,.2,1)}
+  @keyframes up{from{opacity:0;transform:translateY(18px) scale(.98)}}
+  .row{display:flex;gap:16px;align-items:center}
+  .thumb{width:168px;aspect-ratio:16/9;border-radius:14px;object-fit:cover;background:#15151f;flex:none}
+  .meta{min-width:0}
+  .title{font-weight:700;font-size:17px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:12px;color:var(--mute);border:1px solid var(--line);padding:3px 9px;border-radius:99px}
+  .q{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .chip{background:var(--card);border:1px solid var(--line);color:var(--mute);padding:10px 16px;border-radius:12px;font-weight:600;font-size:14px}
+  .chip.on{color:#fff;border-color:transparent;background:linear-gradient(135deg,rgba(124,92,255,.5),rgba(0,229,255,.35));box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
+  .dl{width:100%;margin-top:14px;padding:16px;font-size:17px;background:linear-gradient(135deg,var(--c),var(--a));box-shadow:0 10px 36px rgba(255,61,154,.35)}
+  .dl:hover{filter:brightness(1.12)}
+  .bar{display:none;margin-top:14px}
+  .track{height:8px;border-radius:9px;background:#ffffff12;overflow:hidden}
+  .fill{height:100%;width:0;background:linear-gradient(90deg,var(--b),var(--a),var(--c));border-radius:9px;transition:width .15s}
+  .fill.ind{width:35%;animation:slide 1s ease-in-out infinite alternate}
+  @keyframes slide{from{margin-left:0}to{margin-left:65%}}
+  .stat{display:flex;justify-content:space-between;font-size:13px;color:var(--mute);margin-top:8px}
+  .stat b{color:var(--text);font-variant-numeric:tabular-nums}
+  .feats{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:34px}
+  .feat{font-size:13px;color:var(--mute);padding:8px 14px;border:1px solid var(--line);border-radius:99px;background:var(--card)}
+  .feat i{font-style:normal;margin-right:6px}
+  footer{position:relative;z-index:1;color:#5d6177;font-size:12px;padding:0 20px 26px;text-align:center;max-width:620px}
+  kbd{background:#ffffff12;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px}
+  @media(max-width:560px){.row{flex-direction:column;align-items:stretch}.thumb{width:100%}.go{padding:0 18px}.ghost{display:none}}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="glow g1"></div><div class="glow g2"></div>
+
+<main>
+  <div class="logo"><div class="bolt">⚡</div>ZAP</div>
+  <h1>Paste. <span>Download.</span><br>Gone.</h1>
+  <p class="sub">Any video link. Max speed. Zero ads. Zero clutter.</p>
+
+  <div class="box"><div class="inner">
+    <input id="url" placeholder="Paste a video link…" autocomplete="off" spellcheck="false" autofocus>
+    <button class="ghost" id="paste" title="Paste from clipboard">Paste</button>
+    <button class="go" id="fetch">Go</button>
+  </div></div>
+  <div class="err" id="err"></div>
+
+  <section class="card" id="card">
+    <div class="row">
+      <img class="thumb" id="thumb" alt="">
+      <div class="meta">
+        <div class="title" id="title"></div>
+        <div class="tags" id="tags"></div>
+      </div>
+    </div>
+    <div class="q" id="q"></div>
+    <button class="dl" id="dl">⬇ Download</button>
+    <div class="bar" id="bar">
+      <div class="track"><div class="fill ind" id="fill"></div></div>
+      <div class="stat"><span id="phase">Grabbing…</span><span><b id="speed">0.0</b> MB/s · <b id="pct">0%</b></span></div>
+    </div>
+  </section>
+
+  <div class="feats">
+    <div class="feat"><i>⚡</i>Multi-threaded</div>
+    <div class="feat"><i>🚫</i>No ads</div>
+    <div class="feat"><i>🎧</i>MP3 mode</div>
+    <div class="feat"><i>🌐</i>1000+ sites</div>
+    <div class="feat"><i>⌨️</i><kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere</div>
+  </div>
+</main>
+
+<footer>Only download content you own, that's public domain, or that you have permission to save. Respect creators and each site's terms.</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let quality = 'best', currentUrl = '';
+// Leave empty when running locally. On Netlify, put your backend address here, e.g. 'https://zap-xxxx.onrender.com'
+const API_BASE = '';
+
+// ---------- background: particle network that reacts to mouse ----------
+const cv = $('fx'), cx = cv.getContext('2d'); let W, H, P = [], mouse = {x:-1e3,y:-1e3};
+function size(){ W = cv.width = innerWidth; H = cv.height = innerHeight;
+  P = Array.from({length: Math.min(90, Math.floor(W*H/18000))}, () => ({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35})); }
+addEventListener('resize', size); size();
+addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+(function loop(){
+  cx.clearRect(0,0,W,H);
+  for (const p of P){
+    p.x += p.vx; p.y += p.vy;
+    if (p.x<0||p.x>W) p.vx*=-1; if (p.y<0||p.y>H) p.vy*=-1;
+    const dx = p.x-mouse.x, dy = p.y-mouse.y, d = Math.hypot(dx,dy);
+    if (d<140){ p.x += dx/d*1.2; p.y += dy/d*1.2; }
+    cx.fillStyle = 'rgba(160,170,255,.7)'; cx.beginPath(); cx.arc(p.x,p.y,1.4,0,6.3); cx.fill();
+  }
+  for (let i=0;i<P.length;i++) for (let j=i+1;j<P.length;j++){
+    const d = Math.hypot(P[i].x-P[j].x, P[i].y-P[j].y);
+    if (d<120){ cx.strokeStyle = `rgba(124,92,255,${.22*(1-d/120)})`; cx.beginPath(); cx.moveTo(P[i].x,P[i].y); cx.lineTo(P[j].x,P[j].y); cx.stroke(); }
+  }
+  requestAnimationFrame(loop);
+})();
+
+// ---------- helpers ----------
+const fmtTime = s => { if(!s) return ''; const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=Math.floor(s%60);
+  return (h? h+':'+String(m).padStart(2,'0') : m)+':'+String(x).padStart(2,'0'); };
+const looksLikeUrl = t => /^https?:\/\/\S+$/i.test(t.trim());
+function setErr(m){ $('err').textContent = m || ''; }
+
+// ---------- fetch info ----------
+async function getInfo(){
+  const url = $('url').value.trim();
+  if (!looksLikeUrl(url)) return setErr('Paste a full link starting with http(s)://');
+  setErr(''); $('fetch').disabled = true; $('fetch').textContent = '…'; $('card').style.display = 'none';
+  try{
+    const r = await fetch(API_BASE + '/api/info?url=' + encodeURIComponent(url));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Something went wrong.');
+    currentUrl = url;
+    $('thumb').src = d.thumbnail || ''; $('thumb').style.visibility = d.thumbnail ? 'visible' : 'hidden';
+    $('title').textContent = d.title || 'Untitled';
+    $('tags').innerHTML = [d.site, fmtTime(d.duration), d.uploader].filter(Boolean).map(t=>`<span class="tag">${t.replace(/</g,'&lt;')}</span>`).join('');
+    const opts = [['best','MP4 · Best'], ...[1080,720,480].filter(h => !d.heights.length || d.heights.some(x => x >= h*0.9)).map(h=>[String(h), 'MP4 · '+h+'p']), ['audio','MP3']];
+    quality = 'best';
+    $('q').innerHTML = opts.map(([k,l]) => `<button class="chip ${k==='best'?'on':''}" data-q="${k}">${l}</button>`).join('');
+    $('card').style.display = 'block';
+  }catch(e){ setErr(e.message); }
+  $('fetch').disabled = false; $('fetch').textContent = 'Go';
+}
+
+$('q').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  quality = b.dataset.q; document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+});
+
+// ---------- download with live speed ----------
+async function download(){
+  $('dl').disabled = true; $('bar').style.display = 'block';
+  const fill = $('fill'); fill.className = 'fill ind'; fill.style.width = ''; $('phase').textContent = 'Grabbing at full speed…'; $('speed').textContent = '0.0'; $('pct').textContent = '…';
+  try{
+    const r = await fetch(`${API_BASE}/api/download?url=${encodeURIComponent(currentUrl)}&q=${quality}`);
+    if (!r.ok) throw new Error(await r.text());
+    const total = +r.headers.get('Content-Length') || 0;
+    const cd = r.headers.get('Content-Disposition') || '';
+    const name = decodeURIComponent((cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i) || [,'video.mp4'])[1]);
+    const reader = r.body.getReader(), chunks = []; let got = 0, t0 = performance.now();
+    fill.className = 'fill'; $('phase').textContent = 'Saving…';
+    while (true){
+      const {done, value} = await reader.read(); if (done) break;
+      chunks.push(value); got += value.length;
+      const sec = (performance.now()-t0)/1000 || 1;
+      $('speed').textContent = (got/1048576/sec).toFixed(1);
+      if (total){ const p = got/total*100; fill.style.width = p+'%'; $('pct').textContent = Math.round(p)+'%'; }
+    }
+    fill.style.width = '100%'; $('pct').textContent = '100%'; $('phase').textContent = '✅ Done';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks)); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  }catch(e){ setErr('Download failed: ' + e.message); $('bar').style.display = 'none'; }
+  $('dl').disabled = false;
+}
+
+$('fetch').onclick = getInfo;
+$('dl').onclick = download;
+$('url').addEventListener('keydown', e => { if (e.key === 'Enter') getInfo(); });
+$('paste').onclick = async () => { try{ $('url').value = await navigator.clipboard.readText(); getInfo(); }catch{ setErr('Allow clipboard access, or just press Ctrl+V.'); } };
+// paste anywhere → auto fetch
+addEventListener('paste', e => { const t = (e.clipboardData||window.clipboardData).getData('text'); if (looksLikeUrl(t)){ e.preventDefault(); $('url').value = t.trim(); getInfo(); } });
+</script>
+</body>
+</html>
